@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Management</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #add-item-btn, #create-grocery-list-btn {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .item-form {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .item-form input, .item-form button {
+            margin: 5px 0;
+        }
+        .item-form button {
+            padding: 5px 10px;
+            margin-right: 5px;
+        }
+        .delete-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+        .save-btn {
+            background-color: #007bff;
+            color: white;
+        }
+        .inventory-item {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            background-color: #e9ecef;
+            border-radius: 5px;
+        }
+        .alert-item {
+            background-color: #ffcccb; /* Light red color */
+        }
+        #grocery-list {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Inventory Management</h1>
+    <button id="add-item-btn">+ Add New Item</button>
+    <button id="create-grocery-list-btn">Create Grocery List</button>
+
+    <div id="form-container"></div>
+    <h2>Saved Items</h2>
+    <div id="item-list"></div>
+
+    <h2>Grocery List</h2>
+    <div id="grocery-list"></div>
+
+    <script>
+        // Load saved items from localStorage
+        window.onload = function() {
+            loadSavedItems();
+        };
+
+        document.getElementById('add-item-btn').addEventListener('click', function() {
+            createNewItemForm();
+        });
+
+        document.getElementById('create-grocery-list-btn').addEventListener('click', function() {
+            createGroceryList();
+        });
+
+        // Create a new item form
+        function createNewItemForm() {
+            const formContainer = document.getElementById('form-container');
+
+            const formDiv = document.createElement('div');
+            formDiv.classList.add('item-form');
+
+            formDiv.innerHTML = `
+                <input type="text" class="item-name" placeholder="Item Name" required>
+                <input type="number" class="item-quantity" placeholder="Quantity" required>
+                <input type="number" class="item-threshold" placeholder="Threshold Quantity" required>
+                <input type="date" class="item-expiry" required>
+                <button class="save-btn">Save</button>
+                <button class="delete-btn">Delete</button>
+            `;
+
+            formContainer.appendChild(formDiv);
+
+            // Attach save and delete button functionality
+            formDiv.querySelector('.save-btn').addEventListener('click', function() {
+                saveItem(formDiv);
+            });
+
+            formDiv.querySelector('.delete-btn').addEventListener('click', function() {
+                formDiv.remove();
+            });
+        }
+
+        // Save the item and display it permanently
+        function saveItem(formDiv) {
+            const itemName = formDiv.querySelector('.item-name').value;
+            const itemQuantity = parseInt(formDiv.querySelector('.item-quantity').value);
+            const itemThreshold = parseInt(formDiv.querySelector('.item-threshold').value);
+            const itemExpiry = formDiv.querySelector('.item-expiry').value;
+            const currentDate = new Date().toISOString().split('T')[0];
+
+            // Check for alerts
+            if (itemQuantity <= itemThreshold) {
+                alert(`Warning! Quantity is below or equal to the threshold value (${itemThreshold}). Please restock.`);
+            }
+
+            if (itemExpiry <= currentDate) {
+                alert("Warning! Item is expiring today. Please take necessary actions.");
+            }
+
+            // Create a unique ID for each item
+            const itemId = Date.now().toString();
+
+            const item = {
+                id: itemId,
+                name: itemName,
+                quantity: itemQuantity,
+                threshold: itemThreshold,
+                expiry: itemExpiry
+            };
+
+            // Save the item to localStorage
+            let savedItems = JSON.parse(localStorage.getItem('inventoryItems')) || [];
+            savedItems.push(item);
+            localStorage.setItem('inventoryItems', JSON.stringify(savedItems));
+
+            // Display the item permanently
+            displaySavedItem(item);
+
+            // Remove the form after saving
+            formDiv.remove();
+        }
+
+        // Display the saved item in the list
+        function displaySavedItem(item) {
+            const itemList = document.getElementById('item-list');
+
+            const itemDiv = document.createElement('div');
+            itemDiv.classList.add('inventory-item');
+            itemDiv.setAttribute('data-id', item.id);
+
+            itemDiv.innerHTML = `
+                <strong>${item.name}</strong><br>
+                Quantity: ${item.quantity}<br>
+                Threshold: ${item.threshold}<br>
+                Expiry Date: ${item.expiry}<br>
+                <button class="delete-btn">Delete</button>
+            `;
+
+            itemList.appendChild(itemDiv);
+
+            // Change color if quantity is below or equal to threshold or if expired
+            checkAlertConditions(item, itemDiv);
+
+            // Attach delete functionality to the saved item
+            itemDiv.querySelector('.delete-btn').addEventListener('click', function() {
+                deleteItem(item.id, itemDiv);
+            });
+        }
+
+        // Check conditions for alerts and color changes
+        function checkAlertConditions(item, itemDiv) {
+            const currentDate = new Date().toISOString().split('T')[0];
+            if (item.quantity <= item.threshold || item.expiry <= currentDate) {
+                itemDiv.classList.add('alert-item');
+            }
+        }
+
+        // Load and display saved items from localStorage
+        function loadSavedItems() {
+            const savedItems = JSON.parse(localStorage.getItem('inventoryItems')) || [];
+            savedItems.forEach(item => displaySavedItem(item));
+        }
+
+        // Create and display grocery list based on expired or low stock items
+        function createGroceryList() {
+            const savedItems = JSON.parse(localStorage.getItem('inventoryItems')) || [];
+            const groceryListContainer = document.getElementById('grocery-list');
+            groceryListContainer.innerHTML = ''; // Clear previous list
+
+            const groceryList = savedItems.filter(item => item.quantity <= item.threshold || item.expiry <= new Date().toISOString().split('T')[0]);
+
+            if (groceryList.length === 0) {
+                groceryListContainer.innerHTML = "<p>No items need to be restocked or are expired.</p>";
+                return;
+            }
+
+            const list = document.createElement('ul');
+            groceryList.forEach(item => {
+                const listItem = document.createElement('li');
+                listItem.textContent = `${item.name} (Quantity: ${item.quantity}, Expiry: ${item.expiry})`;
+                list.appendChild(listItem);
+            });
+
+            groceryListContainer.appendChild(list);
+        }
+
+        // Delete an item from both localStorage and the DOM
+        function deleteItem(itemId, itemDiv) {
+            // Remove from localStorage
+            let savedItems = JSON.parse(localStorage.getItem('inventoryItems')) || [];
+            savedItems = savedItems.filter(item => item.id !== itemId);
+            localStorage.setItem('inventoryItems', JSON.stringify(savedItems));
+
+            // Remove from the DOM
+            itemDiv.remove();
+        }
+    </script>
+
+</body>
+</html>
